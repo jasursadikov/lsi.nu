@@ -6,6 +6,8 @@
 
 - **Iconic Representation:** Easily distinguish between different file types and directories at a glance.
 - **Customizable Colors:** Apply custom foreground colors to icons based on file type or directory name.
+- **Symlink Aware:** Symlinks get a dedicated link icon (and an orphan icon when the target is missing).
+- **Display-Only Decoration:** Icons are added only when a listing is rendered, so the underlying data stays clean — `ls | where name == "Hello"` still works.
 - **Nushell Integration:** Seamlessly integrates with your existing Nushell environment.
 
 ## Installation
@@ -41,10 +43,17 @@ Once installed, simply use the `ls` command as you normally would. The output wi
 ls -la
 ```
 
-aditionally you can use the `gst` command for git status with icons.
+Because the icons are applied only at display time, the underlying data is never modified. You can filter, sort, and save listings as usual:
 
-```bash
-gst
+```nushell
+ls | where name == "Hello"
+```
+
+When you *do* want the icons baked into a table (for example, to pipe it somewhere that won't render through the display hook), use `lsi` or the `decorate` filter:
+
+```nushell
+lsi
+ls | decorate
 ```
 
 ## Screenshots
