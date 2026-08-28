@@ -1,35 +1,65 @@
-let __lsi_theme = (open $env.LSI_THEME_PATH)
+# lsi.nu — Nerd Font icons for Nushell's `ls`, applied as pure decoration.
+# The Yazi `theme.toml` is auto-detected at `<nushell-config>/../yazi/theme.toml`
+# (i.e. `~/.config/yazi/theme.toml`). Override it by setting
+# `$env.LSI_THEME_PATH` before sourcing this file.
 
-let __lsi_icons = {
-    dirs: (
-        $__lsi_theme.icon.dirs
-        | reduce -f {} {|it, acc| $acc | upsert $it.name $it }
-    ),
-    files: (
-        $__lsi_theme.icon.files
-        | reduce -f {} {|it, acc|
-            $acc | upsert ($it.name | str lowercase) $it
-        }
-    ),
-    exts: (
-        $__lsi_theme.icon.exts
-        | reduce -f {} {|it, acc| $acc | upsert $it.name $it }
-    )
+const LSI_SYMLINK = { icon: (char --unicode f0c1), fg: "#7fd0e0" }         # nf-fa-link (chain)
+const LSI_SYMLINK_BROKEN = { icon: (char --unicode f127), fg: "#f44336" }  # nf-fa-chain-broken
+
+# --- Icon theme ------------------------------------------------------------
+
+let __lsi_theme_path = (
+    $env.LSI_THEME_PATH?
+    | default ($nu.default-config-dir | path dirname | path join "yazi" "theme.toml")
+)
+
+$env.LSI_THEME_PATH = $__lsi_theme_path
+
+let __lsi_icons = if ($__lsi_theme_path | path exists) {
+    let theme = (open $__lsi_theme_path)
+    {
+        dirs: (
+            $theme.icon.dirs?
+            | default []
+            | reduce -f {} {|it, acc| $acc | upsert $it.name $it }
+        ),
+        files: (
+            $theme.icon.files?
+            | default []
+            | reduce -f {} {|it, acc|
+                $acc | upsert ($it.name | str lowercase) $it
+            }
+        ),
+        exts: (
+            $theme.icon.exts?
+            | default []
+            | reduce -f {} {|it, acc| $acc | upsert $it.name $it }
+        ),
+    }
+} else {
+    print --stderr $"lsi: Yazi theme not found at ($__lsi_theme_path). Set $env.LSI_THEME_PATH to your theme.toml."
+    { dirs: {}, files: {}, exts: {} }
 }
 
+$env.LSI_ICONS = $__lsi_icons
+
 def decorate-file [input] {
+    let icons = $env.LSI_ICONS
     let is_record = ($input | describe | str starts-with "record")
     let path = if $is_record { $input.name } else { $input }
     let name = ($path | path basename)
+    let type = if $is_record { ($input.type? | default "") } else { "" }
 
-    let is_dir = if $is_record {
-        $input.type? == "dir"
-    } else {
-        false
+    # Symlinks get a chain icon (broken-chain when the target is missing),
+    # never the icon of whatever they point at.
+    if $type == "symlink" {
+        let broken = (not ($path | path exists))
+        let deco = if $broken { $LSI_SYMLINK_BROKEN } else { $LSI_SYMLINK }
+        return $"(ansi $deco.fg)($deco.icon)(ansi reset) ($path)"
     }
 
-    if $is_dir {
-        let match = ($__lsi_icons.dirs | get -o $name)
+    if $type == "dir" {
+        let match = ($icons.dirs | get -o $name)
         if $match != null {
             let hex = ($match.fg? | default "#50fa7b")
             return $"(ansi $hex)($match.text)(ansi reset) ($path)"
@@ -38,7 +68,7 @@ def decorate-file [input] {
     }
 
     let lname = ($name | str lowercase)
-    let file_match = ($__lsi_icons.files | get -o $lname)
+    let file_match = ($icons.files | get -o $lname)
 
     if $file_match != null {
         let hex = ($file_match.fg? | default "#f8f8f2")
@@ -53,7 +83,7 @@ def decorate-file [input] {
         | str lowercase
     )
 
-    let ext_match = ($__lsi_icons.exts | get -o $ext)
+    let ext_match = ($icons.exts | get -o $ext)
     if $ext_match != null {
         let hex = ($ext_match.fg? | default "#f8f8f2")
         return $"(ansi $hex)($ext_match.text)(ansi reset) ($path)"
@@ -62,48 +92,32 @@ def decorate-file [input] {
     $path
 }
 
-def --wrapped ls [...args] {
-    let result = (
-        nu -c $"ls ($args | str join ' ') | to nuon"
-        | complete
-    )
+def --env __lsi_add_hook [] {
+    $env.config = ($env.config | upsert hooks { default {} })
 
-    if $result.exit_code != 0 {
-        print -e $result.stderr
-        return
-    }
-
-    let data = ($result.stdout | from nuon)
-
-    if ($data | describe | str starts-with "table") {
-        $data | update name {|row| decorate-file $row }
-    } else {
-        $data
+    $env.config.hooks.display_output = {||
+        let val = $in
+        let is_file_table = (
+            (($val | describe) | str starts-with "table")
+            and ("name" in ($val | columns))
+            and ("type" in ($val | columns))
+        )
+        let out = if $is_file_table {
+            $val | update name {|row| decorate-file $row }
+        } else {
+            $val
+        }
+        if (term size).columns >= 100 { $out | table -e } else { $out | table }
     }
 }
 
-def gst [] {
-  git status --short --porcelain
-  | lines
-  | each { |line|
-      let status = ($line | str substring 0..1)  # Solo 2 caracteres
-      let file = ($line | str substring 3..)
-      {status: $status, file: $file}
-  }
-  | update status { |row|
-      match $row.status {
-        " M" => $"(ansi yellow)(ansi reset)",
-        "A " => $"(ansi green)(ansi reset)",
-        " D" => $"(ansi red)(ansi reset)",
-        "??" => $"(ansi cyan)(ansi reset)",,
-        "MM" => $"(ansi yellow)(ansi reset)",
-        "AM" => $"(ansi green)(ansi yellow)(ansi reset)",
-        "M " => $"(ansi green)✎(ansi reset)",
-        "D " => $"(ansi green)✖(ansi reset)",
-        "R " => $"(ansi purple)﯇(ansi reset)",
-        "UD" | "DU" => $"(ansi red)(ansi reset)",
-        _ => $row.status
-      }
-  }
-  | update file { |row| decorate-file $row.file }
+__lsi_add_hook
+
+def lsi [...args] {
+    let listing = if ($args | is-empty) { ls } else { ls ...$args }
+    $listing | update name {|row| decorate-file $row }
+}
+
+def decorate []: table -> table {
+    update name {|row| decorate-file $row }
 }

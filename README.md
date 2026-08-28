@@ -6,6 +6,8 @@
 
 - **Iconic Representation:** Easily distinguish between different file types and directories at a glance.
 - **Customizable Colors:** Apply custom foreground colors to icons based on file type or directory name.
+- **Symlink Aware:** Symlinks always render as a chain icon (and a broken-chain icon when the target is missing), never the icon of their target — so a link named `foo.json` is never mistaken for a real JSON file.
+- **Display-Only Decoration:** Icons are added only when a listing is rendered, so the underlying data stays clean — `ls | where name == "Hello"` still works.
 - **Nushell Integration:** Seamlessly integrates with your existing Nushell environment.
 
 ## Installation
@@ -16,17 +18,35 @@
 - [Yazi theme](https://github.com/sxyazi/yazi/blob/main/yazi-config/preset/theme-dark.toml)
 - [Nerd Fonts](https://www.nerdfonts.com/)
 
-### Steps
+### Quick install (recommended)
+
+From the cloned repository, run the installer with Nushell:
+
+```nushell
+nu install.nu
+```
+
+It copies `lsi.nu` into your Nushell config directory and appends a `source`
+line to the end of your `config.nu`. Running it again is safe — it never
+adds the `source` line twice. Restart Nushell (or `source` the copied file)
+and `ls` will show icons.
+
+The Yazi `theme.toml` is auto-detected at `~/.config/yazi/theme.toml`.
+Set `$env.LSI_THEME_PATH` before sourcing `lsi.nu` to point somewhere else.
+
+### Manual install
 
 1.  **Save the Script:**
     Save (or update) the `lsi.nu` file to a convenient location, for example, `~/.config/nushell/lsi.nu`.
 
-    ```bash
-    curl -fsSL https://raw.githubusercontent.com/CRAG666/nu_ls_icons/main/lsi.nu | save -f ~/.config/nushell/lsi.nu
+2.  **Source the Script:**
+    Add the following line to the end of your Nushell configuration file (`config.nu`, usually located at `~/.config/nushell/config.nu`):
+
+    ```nushell
+    source ~/.config/nushell/lsi.nu
     ```
 
-2.  **Source the Script:**
-    Add the following line to your Nushell configuration file (`config.nu`, usually located at `~/.config/nushell/config.nu`) to source the script:
+    Optionally override the theme location if it is not at `~/.config/yazi/theme.toml`:
 
     ```nushell
     $env.LSI_THEME_PATH = $"($env.HOME)/.config/yazi/theme.toml"
@@ -41,10 +61,17 @@ Once installed, simply use the `ls` command as you normally would. The output wi
 ls -la
 ```
 
-aditionally you can use the `gst` command for git status with icons.
+Because the icons are applied only at display time, the underlying data is never modified. You can filter, sort, and save listings as usual:
 
-```bash
-gst
+```nushell
+ls | where name == "Hello"
+```
+
+When you *do* want the icons baked into a table (for example, to pipe it somewhere that won't render through the display hook), use `lsi` or the `decorate` filter:
+
+```nushell
+lsi
+ls | decorate
 ```
 
 ## Screenshots
