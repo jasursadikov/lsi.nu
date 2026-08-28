@@ -1,17 +1,21 @@
 # lsi.nu — Nerd Font icons for Nushell's `ls`, applied as pure decoration.
-#
-# Icons are added ONLY when a file listing is rendered to the terminal
-# (through a `display_output` hook), so the underlying data stays clean:
-#
-#     ls | where name == "Hello"   # matches: `name` is exactly "Hello"
-#
-# Set `$env.LSI_THEME_PATH` to a Yazi `theme.toml` before sourcing this file.
+# The Yazi `theme.toml` is auto-detected at `<nushell-config>/../yazi/theme.toml`
+# (i.e. `~/.config/yazi/theme.toml`). Override it by setting
+# `$env.LSI_THEME_PATH` before sourcing this file.
+
+const LSI_SYMLINK = { icon: (char --unicode f0c1), fg: "#7fd0e0" }         # nf-fa-link (chain)
+const LSI_SYMLINK_BROKEN = { icon: (char --unicode f127), fg: "#f44336" }  # nf-fa-chain-broken
 
 # --- Icon theme ------------------------------------------------------------
 
-let __lsi_theme_path = ($env.LSI_THEME_PATH? | default "")
+let __lsi_theme_path = (
+    $env.LSI_THEME_PATH?
+    | default ($nu.default-config-dir | path dirname | path join "yazi" "theme.toml")
+)
 
-let __lsi_icons = if ($__lsi_theme_path != "" and ($__lsi_theme_path | path exists)) {
+$env.LSI_THEME_PATH = $__lsi_theme_path
+
+let __lsi_icons = if ($__lsi_theme_path | path exists) {
     let theme = (open $__lsi_theme_path)
     {
         dirs: (
@@ -31,22 +35,13 @@ let __lsi_icons = if ($__lsi_theme_path != "" and ($__lsi_theme_path | path exis
             | default []
             | reduce -f {} {|it, acc| $acc | upsert $it.name $it }
         ),
-        conds: (
-            $theme.icon.conds?
-            | default []
-            | reduce -f {} {|it, acc| $acc | upsert $it.if $it }
-        ),
     }
 } else {
-    print --stderr "lsi: Yazi theme not found. Set $env.LSI_THEME_PATH to your theme.toml."
-    { dirs: {}, files: {}, exts: {}, conds: {} }
+    print --stderr $"lsi: Yazi theme not found at ($__lsi_theme_path). Set $env.LSI_THEME_PATH to your theme.toml."
+    { dirs: {}, files: {}, exts: {} }
 }
 
 $env.LSI_ICONS = $__lsi_icons
-
-# --- Decoration ------------------------------------------------------------
-# `decorate-file` returns a DISPLAY string. It never mutates real data;
-# it is only ever applied to copies produced for visualization.
 
 def decorate-file [input] {
     let icons = $env.LSI_ICONS
@@ -55,20 +50,15 @@ def decorate-file [input] {
     let name = ($path | path basename)
     let type = if $is_record { ($input.type? | default "") } else { "" }
 
-    # Symlinks get a link icon (orphan icon when the target is missing),
+    # Symlinks get a chain icon (broken-chain when the target is missing),
     # never the icon of whatever they point at.
     if $type == "symlink" {
         let broken = (not ($path | path exists))
-        let key = if $broken { "orphan" } else { "link" }
-        let match = ($icons.conds? | default {} | get -o $key)
-        let hex = ($match.fg? | default "#9e9e9e")
-        let glyph = ($match.text? | default "")
-        return $"(ansi $hex)($glyph)(ansi reset) ($path)"
+        let deco = if $broken { $LSI_SYMLINK_BROKEN } else { $LSI_SYMLINK }
+        return $"(ansi $deco.fg)($deco.icon)(ansi reset) ($path)"
     }
 
-    let is_dir = ($type == "dir")
-
-    if $is_dir {
+    if $type == "dir" {
         let match = ($icons.dirs | get -o $name)
         if $match != null {
             let hex = ($match.fg? | default "#50fa7b")
@@ -102,17 +92,9 @@ def decorate-file [input] {
     $path
 }
 
-# --- Display-only hook -----------------------------------------------------
-# Decorate file-like tables ONLY when they are being displayed. Values that
-# get piped, saved, or converted never pass through this hook, so your data
-# stays icon-free.
-
 def --env __lsi_add_hook [] {
     $env.config = ($env.config | upsert hooks { default {} })
 
-    # `display_output` must be a SINGLE closure (or string). We decorate
-    # file-like tables for display, then hand off to the normal table
-    # renderer. Everything else is rendered untouched.
     $env.config.hooks.display_output = {||
         let val = $in
         let is_file_table = (
@@ -130,10 +112,6 @@ def --env __lsi_add_hook [] {
 }
 
 __lsi_add_hook
-
-# --- Opt-in decoration for pipelines --------------------------------------
-# When you *do* want icons baked into a table (e.g. to pipe somewhere that
-# won't trigger the display hook), use `lsi` or `| decorate`.
 
 def lsi [...args] {
     let listing = if ($args | is-empty) { ls } else { ls ...$args }
