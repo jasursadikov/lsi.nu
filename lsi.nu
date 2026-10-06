@@ -103,7 +103,21 @@ def --env __lsi_add_hook [] {
             and ("type" in ($val | columns))
         )
         let out = if $is_file_table {
-            $val | update name {|row| decorate-file $row }
+            $val | update name {|row|
+                let path = ($row.name | path expand --no-symlink)
+                let uri = if $nu.os-info.name == "windows" {
+                    let path = ($path | str replace --all '\' '/')
+                    let prefix = if ($path | str starts-with '//') {
+                        'file:'
+                    } else {
+                        'file:///'
+                    }
+                    $"($prefix)($path | url encode)"
+                } else {
+                    $"file://($path | url encode)"
+                }
+                $uri | ansi link --text (decorate-file $row)
+            }
         } else {
             $val
         }

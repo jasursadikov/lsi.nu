@@ -7,7 +7,8 @@
 - **Iconic Representation:** Easily distinguish between different file types and directories at a glance.
 - **Customizable Colors:** Apply custom foreground colors to icons based on file type or directory name.
 - **Symlink Aware:** Symlinks always render as a chain icon (and a broken-chain icon when the target is missing), never the icon of their target — so a link named `foo.json` is never mistaken for a real JSON file.
-- **Display-Only Decoration:** Icons are added only when a listing is rendered, so the underlying data stays clean — `ls | where name == "Hello"` still works.
+- **Clickable Names:** Open files and directories from the listing using OSC 8 hyperlinks in supported terminals.
+- **Display-Only Decoration:** Icons and hyperlinks are added only when a listing is rendered, so the underlying data stays clean — `ls | where name == "Hello"` still works.
 - **Nushell Integration:** Seamlessly integrates with your existing Nushell environment.
 
 ## Installation
@@ -29,7 +30,7 @@ nu install.nu
 It copies `lsi.nu` into your Nushell config directory and appends a `source`
 line to the end of your `config.nu`. Running it again is safe — it never
 adds the `source` line twice. Restart Nushell (or `source` the copied file)
-and `ls` will show icons.
+and `ls` will show icons and clickable names.
 
 The Yazi `theme.toml` is auto-detected at `~/.config/yazi/theme.toml`.
 Set `$env.LSI_THEME_PATH` before sourcing `lsi.nu` to point somewhere else.
@@ -57,11 +58,14 @@ Set `$env.LSI_THEME_PATH` before sourcing `lsi.nu` to point somewhere else.
 
 Once installed, simply use the `ls` command as you normally would. The output will now include icons and custom colors for files and directories based on your theme configuration.
 
+In terminals that support OSC 8 hyperlinks, click a name to open it using your
+terminal's link-opening gesture (often Ctrl+click).
+
 ```bash
 ls -la
 ```
 
-Because the icons are applied only at display time, the underlying data is never modified. You can filter, sort, and save listings as usual:
+Because icons and hyperlinks are applied only at display time, the underlying data is never modified. You can filter, sort, and save listings as usual:
 
 ```nushell
 ls | where name == "Hello"
@@ -73,6 +77,8 @@ When you *do* want the icons baked into a table (for example, to pipe it somewhe
 lsi
 ls | decorate
 ```
+
+Hyperlinks are added only by the display hook, so `lsi` and `decorate` also keep link escape sequences out of pipeline data.
 
 ## Screenshots
 
