@@ -1,6 +1,8 @@
-# Nushell ls Icons
+# Nushell `ls` Icons
 
-`nu_ls_icons` is a Nushell script that enhances the standard `ls` command by adding custom icons and colors to file and directory names. This provides a more visually informative and aesthetically pleasing terminal experience.
+![](.img/img.png)
+
+`lsi.nu` is a Nushell script that enhances the standard `ls` command by adding custom icons and colors to file and directory names. This provides a more visually informative and aesthetically pleasing terminal experience.
 
 ## Features
 
@@ -79,18 +81,3 @@ ls | decorate
 ```
 
 Hyperlinks are added only by the display hook, so `lsi` and `decorate` also keep link escape sequences out of pipeline data.
-
-## Screenshots
-
-Here are some examples of `nu_ls_icons` in action:
-
-![Screenshot 1](.show_case/2026-02-08-171258_hyprshot.png)
-![Screenshot 2](.show_case/2026-02-09-001532_hyprshot.png)
-![Screenshot 3](.show_case/2026-02-09-001546_hyprshot.png)
-![Screenshot 4](.show_case/2026-02-09-001617_hyprshot.png)
-
-## Contributing
-
-**Pull requests are welcome!** If you have improvements, bug fixes, or new features, feel free to submit a PR directly instead of opening an issue. This helps move things forward faster.
-
-If you're not sure about something, you can still open a discussion or issue, but PRs are preferred.
